@@ -1,0 +1,171 @@
+Here’s a Terraform module for an end-to-end Azure Data Pipeline, integrating Azure Data Lake, Azure Data Factory, Azure Databricks, and Azure Synapse Analytics. This setup assumes that you’re provisioning infrastructure required to implement a modern data pipeline on Azure.
+Step 1: Create the Module Structure
+You can structure the module as follows:
+terraform-azure-data-pipeline/
+├── main.tf
+├── variables.tf
+├── outputs.tf
+├── README.md
+Step 2: Define the Terraform Code
+main.tf
+This file will provision the necessary resources for each component.
+# Azure Provider
+provider "azurerm" {
+  features {}
+}
+# -------------------------
+# Resource Group
+# -------------------------
+resource "azurerm_resource_group" "rg" {
+  name     = var.resource_group_name
+  location = var.location
+}
+# -------------------------
+# Azure Data Lake Storage
+# -------------------------
+resource "azurerm_storage_account" "datalake" {
+  name                     = var.storage_account_name
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = azurerm_resource_group.rg.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  kind                     = "StorageV2"
+  enable_https_traffic_only = true
+}
+resource "azurerm_storage_data_lake_gen2_filesystem" "filesystem" {
+  name               = var.datalake_filesystem_name
+  storage_account_id = azurerm_storage_account.datalake.id
+}
+# -------------------------
+# Azure Data Factory
+# -------------------------
+resource "azurerm_data_factory" "datafactory" {
+  name                = var.data_factory_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+}
+# Data Factory Pipeline (optional - example pipeline resource)
+resource "azurerm_data_factory_pipeline" "example_pipeline" {
+  name                = "example-pipeline"
+  resource_group_name = azurerm_resource_group.rg.name
+  data_factory_name   = azurerm_data_factory.datafactory.name
+}
+# -------------------------
+# Azure Databricks Workspace
+# -------------------------
+resource "azurerm_databricks_workspace" "databricks" {
+  name                = var.databricks_workspace_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "standard"
+}
+# Optional: Add Databricks cluster configuration here
+# -------------------------
+# Azure Synapse Analytics
+# -------------------------
+resource "azurerm_synapse_workspace" "synapse" {
+  name                = var.synapse_workspace_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  storage_data_lake_gen2_filesystem_id = azurerm_storage_data_lake_gen2_filesystem.filesystem.id
+  sql_administrator_login = var.synapse_admin_login
+  sql_administrator_login_password = var.synapse_admin_password
+}
+resource "azurerm_synapse_sql_pool" "synapse_pool" {
+  name                = var.synapse_sql_pool_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  workspace_name      = azurerm_synapse_workspace.synapse.name
+  sku_name            = "DW100c"
+}
+# -------------------------
+# Azure Synapse Firewall Rule (optional - allow access to Synapse)
+# -------------------------
+resource "azurerm_synapse_firewall_rule" "firewall" {
+  name                = "allow-all"
+  resource_group_name = azurerm_resource_group.rg.name
+  workspace_name      = azurerm_synapse_workspace.synapse.name
+  start_ip_address    = "0.0.0.0"
+  end_ip_address      = "255.255.255.255"
+}
+variables.tf
+Define the variables used in the module.
+variable "resource_group_name" {
+  description = "The name of the resource group"
+  type        = string
+}
+variable "location" {
+  description = "The Azure region where the resources should be created"
+  type        = string
+}
+variable "storage_account_name" {
+  description = "The name of the Azure Storage account"
+  type        = string
+}
+variable "datalake_filesystem_name" {
+  description = "The name of the Data Lake Gen2 filesystem"
+  type        = string
+}
+variable "data_factory_name" {
+  description = "The name of the Azure Data Factory"
+  type        = string
+}
+variable "databricks_workspace_name" {
+  description = "The name of the Azure Databricks workspace"
+  type        = string
+}
+variable "synapse_workspace_name" {
+  description = "The name of the Azure Synapse workspace"
+  type        = string
+}
+variable "synapse_sql_pool_name" {
+  description = "The name of the Synapse SQL pool"
+  type        = string
+}
+variable "synapse_admin_login" {
+  description = "Admin login for Synapse SQL"
+  type        = string
+}
+variable "synapse_admin_password" {
+  description = "Admin password for Synapse SQL"
+  type        = string
+}
+outputs.tf
+Define the outputs of the resources for reference.
+output "resource_group_name" {
+  value = azurerm_resource_group.rg.name
+}
+output "data_lake_storage_account_name" {
+  value = azurerm_storage_account.datalake.name
+}
+output "data_factory_name" {
+  value = azurerm_data_factory.datafactory.name
+}
+output "databricks_workspace_url" {
+  value = azurerm_databricks_workspace.databricks.workspace_url
+}
+output "synapse_workspace_name" {
+  value = azurerm_synapse_workspace.synapse.name
+}
+Step 3: Apply the Module
+In your root Terraform module, you can reference this module by creating a main.tf that calls the module:
+module "azure_data_pipeline" {
+  source = "./terraform-azure-data-pipeline"
+  resource_group_name        = "rg-data-pipeline"
+  location                   = "East US"
+  storage_account_name        = "mystorageaccount"
+  datalake_filesystem_name    = "datalake"
+  data_factory_name           = "mydatafactory"
+  databricks_workspace_name   = "mydatabricksworkspace"
+  synapse_workspace_name      = "mysynapseworkspace"
+  synapse_sql_pool_name       = "mysqlpool"
+  synapse_admin_login         = "adminuser"
+  synapse_admin_password      = "Password123!"
+}
+Step 4: Execute Terraform
+To deploy the infrastructure, run the following commands:
+terraform init
+terraform plan
+terraform apply
+This setup provisions Azure Data Lake for storage, Azure Data Factory for orchestrating data workflows, Azure Databricks for data engineering, and Azure Synapse Analytics for data warehousing.
+Let me know if you need further customization or have specific requirements for the pipeline!
